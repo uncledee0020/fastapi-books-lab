@@ -1,0 +1,39 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "apimName": {
+      "type": "string",
+      "metadata": { "description": "Name of API Management instance" }
+    },
+    "publisherEmail": {
+      "type": "string",
+      "defaultValue": "dnmusili@safaricom.co.ke"
+    },
+    "publisherName": {
+      "type": "string",
+      "defaultValue": "Books API Publisher"
+    },
+    "sku": {
+      "type": "string",
+      "defaultValue": "Developer",
+      "allowedValues": ["Developer", "Basic", "Standard", "Premium"]
+    }
+  },
+  "resources": [
+    {
+      "type": "Microsoft.ApiManagement/service",
+      "apiVersion": "2021-08-01",
+      "name": "[parameters('apimName')]",
+      "location": "[resourceGroup().location]",
+      "sku": {
+        "name": "[parameters('sku')]",
+        "capacity": 1
+      },
+      "properties": {
+        "publisherEmail": "[parameters('publisherEmail')]",
+        "publisherName": "[parameters('publisherName')]"
+      }
+    }
+  ]
+}
