@@ -13,8 +13,8 @@ trigger:
       - policies/*
 
 variables:
-  azureSubscription: 'azure-service-connection'
-  # azureSubscription: 'Moringa School Cohort'
+  # azureSubscription: 'azure-service-connection'
+  azureSubscription: 'Moringa School Cohort'
   resourceGroup: 'AzureDevelopers-MoringaSchool'
   acrName: 'acrbooksapidnm'
   appName: 'fastapi-books-api'
