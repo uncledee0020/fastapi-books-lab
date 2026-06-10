@@ -128,7 +128,7 @@ stages:
                     echo "Logging into Azure CLI via App Registration credentials..."
                     
                     # Log into Azure CLI using your ACR username and password
-                    az login --service-principal -u "http://$(acrName)" -p "$(ACR_PASSWORD)" --tenant "YOUR_AZURE_TENANT_ID_HERE"
+                    az login --service-principal -u "http://$(acrName)" -p "$(ACR_PASSWORD)" --tenant "19a4db07-607d-475f-a518-0e3b699ac7d0"
                     
                     echo "Configuring App Service container target image..."
                     az webapp config container set \
