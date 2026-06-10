@@ -1,0 +1,70 @@
+name: Deploy Books API to Azure
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+env:
+  AZURE_RESOURCE_GROUP: rg-books-api-lab
+  AZURE_APIM_NAME: apim-books-api-XX
+  AZURE_APP_NAME: app-books-api-XX
+  AZURE_ACR_NAME: acrbooksapiXX
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Azure Login
+        uses: azure/login@v1
+        with:
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
+
+      - name: Build and Push Books API Image
+        run: |
+          az acr build             --image fastapi-books-api:${{ github.sha }}             --registry ${{ env.AZURE_ACR_NAME }}             --file Dockerfile .
+
+  deploy-app:
+    needs: build
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main'
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Azure Login
+        uses: azure/login@v1
+        with:
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
+
+      - name: Deploy Books API to App Service
+        uses: azure/webapps-deploy@v3
+        with:
+          app-name: ${{ env.AZURE_APP_NAME }}
+          images: '${{ env.AZURE_ACR_NAME }}.azurecr.io/fastapi-books-api:${{ github.sha }}'
+
+  deploy-apim:
+    needs: deploy-app
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main'
+    environment: production
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Azure Login
+        uses: azure/login@v1
+        with:
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
+
+      - name: Import Books API into APIM
+        run: |
+          sleep 30
+          az apim api import             --resource-group ${{ env.AZURE_RESOURCE_GROUP }}             --service-name ${{ env.AZURE_APIM_NAME }}             --api-id books-api             --path books             --specification-format OpenApiJson             --specification-url "https://${{ env.AZURE_APP_NAME }}.azurewebsites.net/openapi.json"             --display-name "Books API"
+
+      - name: Run Smoke Tests
+        run: |
+          curl -f -H "Ocp-Apim-Subscription-Key: ${{ secrets.APIM_SUBSCRIPTION_KEY }}"                "https://${{ env.AZURE_APIM_NAME }}.azure-api.net/books/books"             || exit 1
+
+          curl -f -H "Ocp-Apim-Subscription-Key: ${{ secrets.APIM_SUBSCRIPTION_KEY }}"                "https://${{ env.AZURE_APIM_NAME }}.azure-api.net/books/books/1"             || exit 1
