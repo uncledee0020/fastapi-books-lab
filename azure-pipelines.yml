@@ -32,35 +32,17 @@ stages:
         displayName: Build Job
         pool:
           vmImage: $(vmImageName)
-        # steps:
-        #   - task: Docker@2
-        #     displayName: Build and Push to ACR
-        #     inputs:
-        #       command: buildAndPush
-        #       repository: $(imageRepository)
-        #       dockerfile: '$(Build.SourcesDirectory)/Dockerfile'
-        #       containerRegistry: '$(azureSubscription)'
-        #       tags: |
-        #         $(tag)
-        #         latest
         steps:
-          # Use your working AzureRM connection to log into Docker natively
-          - task: AzureCLI@2
-            displayName: Log into ACR and Push Image
+          - task: Docker@2
+            displayName: Build and Push to ACR
             inputs:
-              azureSubscription: $(azureSubscription)
-              scriptType: bash
-              scriptLocation: inlineScript
-              inlineScript: |
-                # 1. Log into your Azure Container Registry
-                az acr login --name $(acrName)
-                
-                # 2. Build the Docker image
-                docker build -t $(acrName).azurecr.io/$(imageRepository):$(tag) -t $(acrName).azurecr.io/$(imageRepository):latest -f $(Build.SourcesDirectory)/Dockerfile $(Build.SourcesDirectory)
-                
-                # 3. Push both tags to the registry
-                docker push $(acrName).azurecr.io/$(imageRepository):$(tag)
-                docker push $(acrName).azurecr.io/$(imageRepository):latest
+              command: buildAndPush
+              repository: $(imageRepository)
+              dockerfile: '$(Build.SourcesDirectory)/Dockerfile'
+              containerRegistry: 'acr-service-connection'
+              tags: |
+                $(tag)
+                latest
 
   # Stage 2: Deploy Books API to App Service
   - stage: DeployApp
