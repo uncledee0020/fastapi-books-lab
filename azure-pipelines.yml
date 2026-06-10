@@ -137,7 +137,7 @@ stages:
                     azureSubscription: $(azureSubscription)
                     scriptType: bash
                     inlineScript: |
-                      az deployment group create                         --resource-group rg-books-api-dev                         --template-file infrastructure/azuredeploy.json                         --parameters infrastructure/azuredeploy.parameters.dev.json
+                      az deployment group create                         --resource-group $(resourceGroup)                         --template-file infrastructure/azuredeploy.json                         --parameters infrastructure/azuredeploy.parameters.dev.json
 
-                      az apim api import                         --resource-group rg-books-api-dev                         --service-name apim-books-api-dev                         --api-id books-api                         --path books                         --specification-format OpenApiJson                         --specification-url "https://app-books-api-dev.azurewebsites.net/openapi.json"
+                      az apim api import                         --resource-group $(resourceGroup)                         --service-name apim-books-api-dev                         --api-id books-api                         --path books                         --specification-format OpenApiJson                         --specification-url "https://app-books-api-dev.azurewebsites.net/openapi.json"
 
