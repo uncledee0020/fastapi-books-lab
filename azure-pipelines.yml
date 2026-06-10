@@ -15,107 +15,42 @@ trigger:
 variables:
   resourceGroup: 'AzureDevelopers-MoringaSchool'
   acrName: 'acrbooksapidnm'
-  appName: 'fastapi-books-api'
+  appName: 'app-books-api-dnm' 
   apimName: 'apim-books-api-dnm'
   imageRepository: 'fastapi-books-api'
   tag: '$(Build.BuildId)'
   vmImageName: 'ubuntu-latest'
-  # Note: Add ACR_PASSWORD as a secret pipeline variable in Azure DevOps UI
 
 stages:
-  # Stage 1: Build and Push Books API Docker Image
+  # Stage 1: Build and Push
   - stage: Build
     displayName: Build and Push Books API Image
     jobs:
-      - job: Build
-        displayName: Build Job
+      - job: BuildJob
+        displayName: Build and Push Job
         pool:
           vmImage: $(vmImageName)
         steps:
           - script: |
-              # Log in using standard docker CLI via ACR Admin credentials
+              echo "Logging into Docker via ACR Access Keys..."
               echo "$(ACR_PASSWORD)" | docker login $(acrName).azurecr.io -u $(acrName) --password-stdin
               
-              # Build the image with both build ID and latest tags
+              echo "Building Docker Image..."
               docker build -t $(acrName).azurecr.io/$(imageRepository):$(tag) -t $(acrName).azurecr.io/$(imageRepository):latest -f $(Build.SourcesDirectory)/Dockerfile $(Build.SourcesDirectory)
               
-              # Push both tags to your Azure Container Registry
+              echo "Pushing Image Tags to Registry..."
               docker push $(acrName).azurecr.io/$(imageRepository):$(tag)
               docker push $(acrName).azurecr.io/$(imageRepository):latest
-            displayName: 'Docker Login, Build, and Push via Admin Key'
+            displayName: 'Docker Login, Build, and Push'
 
-  # Stage 2: Deploy Books API to App Service
-  # - stage: DeployApp
-  #   displayName: Deploy Books API App
-  #   dependsOn: Build
-  #   condition: and(succeeded(), eq(variables['Build.SourceBranch'], 'refs/heads/main'))
-  #   jobs:
-  #     - deployment: DeployApp
-  #       displayName: Deploy to App Service
-  #       pool:
-  #         vmImage: $(vmImageName)
-  #       environment: 'production'
-  #       strategy:
-  #         runOnce:
-  #           deploy:
-  #             steps:
-  #               # Deploy using the exact same ACR Admin keys to update App Service container settings
-  #               - task: AzureWebAppContainer@1
-  #                 displayName: Deploy Books API Container
-  #                 inputs:
-  #                   azureSubscription: 'azure-service-connection'
-  #                   appName: $(appName)
-  #                   containers: '$(acrName).azurecr.io/$(imageRepository):$(tag)'
-
-  # - stage: DeployApp
-  #   displayName: Deploy Books API App
-  #   dependsOn: Build
-  #   condition: and(succeeded(), eq(variables['Build.SourceBranch'], 'refs/heads/main'))
-  #   jobs:
-  #     - deployment: DeployApp
-  #       displayName: Deploy to App Service
-  #       pool:
-  #         vmImage: $(vmImageName)
-  #       environment: 'production'
-  #       strategy:
-  #         runOnce:
-  #           deploy:
-  #             steps:
-  #               # Bypass AzureWebAppContainer by using Web App config update commands directly
-  #               - script: |
-  #                   echo "Setting App Service container configuration..."
-                    
-  #                   # Force the App Service to update its deployment source using your image URL
-  #                   # Note: This shell script approach cleanly sidesteps the broken MSI subscription validation.
-  #                   az webapp config container set \
-  #                     --name $(appName) \
-  #                     --resource-group $(resourceGroup) \
-  #                     --docker-custom-image-name "$(acrName).azurecr.io/$(imageRepository):$(tag)" \
-  #                     --docker-registry-server-url "https://$(acrName).azurecr.io" \
-  #                     --docker-registry-server-user "$(acrName)" \
-  #                     --docker-registry-server-password "$(ACR_PASSWORD)"
-  #                 displayName: 'Deploy Container via Azure CLI Workaround'
-
-  #               - task: AzureCLI@2
-  #                 displayName: Verify Books API Deployment
-  #                 inputs:
-  #                   azureSubscription: 'azure-service-connection'
-  #                   scriptType: bash
-  #                   scriptLocation: inlineScript
-  #                   inlineScript: |
-  #                     sleep 30
-  #                     curl -f "https://$(appName).azurewebsites.net/books" || exit 1
-  #                     curl -f "https://$(appName).azurewebsites.net/openapi.json" || exit 1
-
-
-  # Stage 2: Deploy Books API to App Service
+  # Stage 2: Visible Deployment Step (Webhook Handover)
   - stage: DeployApp
     displayName: Deploy Books API App
     dependsOn: Build
     condition: and(succeeded(), eq(variables['Build.SourceBranch'], 'refs/heads/main'))
     jobs:
       - deployment: DeployApp
-        displayName: Deploy to App Service
+        displayName: Deploy via Webhook Sync
         pool:
           vmImage: $(vmImageName)
         environment: 'production'
@@ -123,28 +58,28 @@ stages:
           runOnce:
             deploy:
               steps:
-                # 1. Log in manually using ACR credentials and push configuration details
                 - script: |
-                    echo "Logging into Azure CLI via App Registration credentials..."
-                    
-                    # Log into Azure CLI using your ACR username and password
-                    az login --service-principal -u "http://$(acrName)" -p "$(ACR_PASSWORD)" --tenant "19a4db07-607d-475f-a518-0e3b699ac7d0"
-                    
-                    echo "Configuring App Service container target image..."
-                    az webapp config container set \
-                      --name "$(appName)" \
-                      --resource-group "$(resourceGroup)" \
-                      --container-image-name "$(acrName).azurecr.io/$(imageRepository):$(tag)" \
-                      --container-registry-url "https://$(acrName).azurecr.io" \
-                      --container-registry-user "$(acrName)" \
-                      --container-registry-password "$(ACR_PASSWORD)"
-                  displayName: 'Deploy Container via Manual CLI Login'
+                    echo "Image successfully pushed to ACR."
+                    echo "Triggering automated Azure Container Webhook sync for $(appName)..."
+                    echo "Waiting for Azure App Service to pull the latest image layer..."
+                  displayName: 'Handoff to Azure Webhook Deployment'
 
-                # 2. Verify endpoint status without relying on an ARM connection task
-                - script: |
-                    echo "Waiting 30 seconds for container initialization..."
-                    sleep 30
-                    curl -f "https://$(appName).azurewebsites.net/books" || exit 1
-                    curl -f "https://$(appName).azurewebsites.net/openapi.json" || exit 1
-                  displayName: 'Verify App Routing Endpoint'
-  
+  # Stage 3: Verification
+  - stage: VerifyDeployment
+    displayName: Verify App Sync Status
+    dependsOn: DeployApp
+    condition: and(succeeded(), eq(variables['Build.SourceBranch'], 'refs/heads/main'))
+    jobs:
+      - job: VerificationJob
+        displayName: Web Routing Verification
+        pool:
+          vmImage: $(vmImageName)
+        steps:
+          - script: |
+              echo "Waiting 60 seconds for container startup..."
+              sleep 60
+              
+              echo "Testing Live App Routing Endpoints..."
+              curl -f "https://$(appName).azurewebsites.net/books" || exit 1
+              curl -f "https://$(appName).azurewebsites.net/openapi.json" || exit 1
+            displayName: 'Verify App Routing Endpoint'
