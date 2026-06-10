@@ -94,7 +94,7 @@ class BookRequest(BaseModel):
 
 
 BOOKS = [
-    Book(1, 'Computer Science Pro', 'codingwithroby', 'A very nice book!', 5, 2030),
+    Book(1, 'Computer Science Pro', 'codingwithroby', 'A very nice book!', 5, 2031),
     Book(2, 'Be Fast with FastAPI', 'codingwithroby', 'A great book!', 5, 2030),
     Book(3, 'Master Endpoints', 'codingwithroby', 'A awesome book!', 5, 2029),
     Book(4, 'HP1', 'Author 1', 'Book Description', 2, 2028),
