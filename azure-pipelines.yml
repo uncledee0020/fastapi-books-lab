@@ -45,6 +45,28 @@ stages:
             displayName: 'Docker Login, Build, and Push via Admin Key'
 
   # Stage 2: Deploy Books API to App Service
+  # - stage: DeployApp
+  #   displayName: Deploy Books API App
+  #   dependsOn: Build
+  #   condition: and(succeeded(), eq(variables['Build.SourceBranch'], 'refs/heads/main'))
+  #   jobs:
+  #     - deployment: DeployApp
+  #       displayName: Deploy to App Service
+  #       pool:
+  #         vmImage: $(vmImageName)
+  #       environment: 'production'
+  #       strategy:
+  #         runOnce:
+  #           deploy:
+  #             steps:
+  #               # Deploy using the exact same ACR Admin keys to update App Service container settings
+  #               - task: AzureWebAppContainer@1
+  #                 displayName: Deploy Books API Container
+  #                 inputs:
+  #                   azureSubscription: 'azure-service-connection'
+  #                   appName: $(appName)
+  #                   containers: '$(acrName).azurecr.io/$(imageRepository):$(tag)'
+
   - stage: DeployApp
     displayName: Deploy Books API App
     dependsOn: Build
@@ -59,10 +81,28 @@ stages:
           runOnce:
             deploy:
               steps:
-                # Deploy using the exact same ACR Admin keys to update App Service container settings
-                - task: AzureWebAppContainer@1
-                  displayName: Deploy Books API Container
+                # Bypass AzureWebAppContainer by using Web App config update commands directly
+                - script: |
+                    echo "Setting App Service container configuration..."
+                    
+                    # Force the App Service to update its deployment source using your image URL
+                    # Note: This shell script approach cleanly sidesteps the broken MSI subscription validation.
+                    az webapp config container set \
+                      --name $(appName) \
+                      --resource-group $(resourceGroup) \
+                      --docker-custom-image-name "$(acrName).azurecr.io/$(imageRepository):$(tag)" \
+                      --docker-registry-server-url "https://$(acrName).azurecr.io" \
+                      --docker-registry-server-user "$(acrName)" \
+                      --docker-registry-server-password "$(ACR_PASSWORD)"
+                  displayName: 'Deploy Container via Azure CLI Workaround'
+
+                - task: AzureCLI@2
+                  displayName: Verify Books API Deployment
                   inputs:
                     azureSubscription: 'azure-service-connection'
-                    appName: $(appName)
-                    containers: '$(acrName).azurecr.io/$(imageRepository):$(tag)'
+                    scriptType: bash
+                    scriptLocation: inlineScript
+                    inlineScript: |
+                      sleep 30
+                      curl -f "https://$(appName).azurewebsites.net/books" || exit 1
+                      curl -f "https://$(appName).azurewebsites.net/openapi.json" || exit 1
