@@ -99,7 +99,7 @@ stages:
           - task: AzureCLI@2
             displayName: Import Books API into APIM
             inputs:
-              azureSubscription: $(azureSubscription)
+              azureSubscription: 'azure-service-connection'
               scriptType: bash
               scriptLocation: inlineScript
               inlineScript: |
@@ -108,7 +108,7 @@ stages:
           - task: AzureCLI@2
             displayName: Update Books API Policy
             inputs:
-              azureSubscription: $(azureSubscription)
+              azureSubscription: 'azure-service-connection'
               scriptType: bash
               scriptLocation: inlineScript
               inlineScript: |
@@ -117,7 +117,7 @@ stages:
           - task: AzureCLI@2
             displayName: Update Global Policy
             inputs:
-              azureSubscription: $(azureSubscription)
+              azureSubscription: 'azure-service-connection'
               scriptType: bash
               scriptLocation: inlineScript
               inlineScript: |
@@ -134,7 +134,7 @@ stages:
               steps:
                 - task: AzureCLI@2
                   inputs:
-                    azureSubscription: $(azureSubscription)
+                    azureSubscription: 'azure-service-connection'
                     scriptType: bash
                     inlineScript: |
                       az deployment group create                         --resource-group $(resourceGroup)                         --template-file infrastructure/azuredeploy.json                         --parameters infrastructure/azuredeploy.parameters.dev.json
