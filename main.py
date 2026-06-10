@@ -1,11 +1,29 @@
+import logging
 from typing import Optional
-from fastapi import FastAPI, Path, Query, HTTPException, Body
+from fastapi import FastAPI, Path, Query, HTTPException, Body, Request
 from pydantic import BaseModel, Field
 from starlette import status
+from fastapi.openapi.utils import get_openapi
+
+# Configure internal logger to print directly into Azure Log Stream
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger("uvicorn.error")
 
 app = FastAPI(title="Books API", version="1.0.0", description="A simple Books management API")
 
-from fastapi.openapi.utils import get_openapi
+
+# Custom middleware to expose transformations in Azure Log Stream
+@app.middleware("http")
+async def log_transformed_headers(request: Request, call_next):
+    logger.info("====== INCOMING TRANSFORMED HEADERS ======")
+    logger.info(f"x-correlation-id: {request.headers.get('x-correlation-id')}")
+    logger.info(f"x-apim-region: {request.headers.get('x-apim-region')}")
+    logger.info(f"X-Forwarded-For: {request.headers.get('x-forwarded-for')}")
+    logger.info("==========================================")
+    
+    response = await call_next(request)
+    return response
+
 
 def custom_openapi():
     if app.openapi_schema:

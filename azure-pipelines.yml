@@ -83,3 +83,61 @@ stages:
               curl -f "https://$(appName).azurewebsites.net/books" || exit 1
               curl -f "https://$(appName).azurewebsites.net/openapi.json" || exit 1
             displayName: 'Verify App Routing Endpoint'
+
+
+  # Stage 4: Deploy Books API to APIM
+  - stage: DeployAPIM
+    displayName: Deploy Books API to APIM
+    dependsOn: DeployApp
+    condition: succeeded()
+    jobs:
+      - job: DeployAPIM
+        displayName: Deploy API and Policies
+        pool:
+          vmImage: $(vmImageName)
+        steps:
+          - task: AzureCLI@2
+            displayName: Import Books API into APIM
+            inputs:
+              azureSubscription: $(azureSubscription)
+              scriptType: bash
+              scriptLocation: inlineScript
+              inlineScript: |
+                az apim api import                   --resource-group $(resourceGroup)                   --service-name $(apimName)                   --api-id books-api                   --path books                   --specification-format OpenApiJson                   --specification-url "https://$(appName).azurewebsites.net/openapi.json"                   --display-name "Books API"
+
+          - task: AzureCLI@2
+            displayName: Update Books API Policy
+            inputs:
+              azureSubscription: $(azureSubscription)
+              scriptType: bash
+              scriptLocation: inlineScript
+              inlineScript: |
+                az apim api policy create                   --resource-group $(resourceGroup)                   --service-name $(apimName)                   --api-id books-api                   --policy-format xml                   --value $(Build.SourcesDirectory)/policies/books-api-policy.xml
+
+          - task: AzureCLI@2
+            displayName: Update Global Policy
+            inputs:
+              azureSubscription: $(azureSubscription)
+              scriptType: bash
+              scriptLocation: inlineScript
+              inlineScript: |
+                az apim policy create                   --resource-group $(resourceGroup)                   --service-name $(apimName)                   --policy-format xml                   --value $(Build.SourcesDirectory)/policies/global-policy.xml
+
+  - stage: DeployDev
+    displayName: Deploy Books API to Development
+    jobs:
+      - deployment: DeployDev
+        environment: 'development'
+        strategy:
+          runOnce:
+            deploy:
+              steps:
+                - task: AzureCLI@2
+                  inputs:
+                    azureSubscription: $(azureSubscription)
+                    scriptType: bash
+                    inlineScript: |
+                      az deployment group create                         --resource-group rg-books-api-dev                         --template-file infrastructure/azuredeploy.json                         --parameters infrastructure/azuredeploy.parameters.dev.json
+
+                      az apim api import                         --resource-group rg-books-api-dev                         --service-name apim-books-api-dev                         --api-id books-api                         --path books                         --specification-format OpenApiJson                         --specification-url "https://app-books-api-dev.azurewebsites.net/openapi.json"
+

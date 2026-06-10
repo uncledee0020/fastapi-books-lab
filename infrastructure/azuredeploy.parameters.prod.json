@@ -1,0 +1,6 @@
+{
+  "parameters": {
+    "apimName": { "value": "apim-books-api-prod" },
+    "sku": { "value": "Standard" }
+  }
+}
