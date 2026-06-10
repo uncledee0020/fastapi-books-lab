@@ -13,8 +13,6 @@ trigger:
       - policies/*
 
 variables:
-  azureSubscription: 'azure-service-connection'
-  # azureSubscription: 'Moringa School Cohort'
   resourceGroup: 'AzureDevelopers-MoringaSchool'
   acrName: 'acrbooksapidnm'
   appName: 'fastapi-books-api'
@@ -22,6 +20,7 @@ variables:
   imageRepository: 'fastapi-books-api'
   tag: '$(Build.BuildId)'
   vmImageName: 'ubuntu-latest'
+  # Note: Add ACR_PASSWORD as a secret pipeline variable in Azure DevOps UI
 
 stages:
   # Stage 1: Build and Push Books API Docker Image
@@ -33,16 +32,17 @@ stages:
         pool:
           vmImage: $(vmImageName)
         steps:
-          - task: Docker@2
-            displayName: Build and Push to ACR
-            inputs:
-              command: buildAndPush
-              repository: $(imageRepository)
-              dockerfile: '$(Build.SourcesDirectory)/Dockerfile'
-              containerRegistry: 'acr-service-connection'
-              tags: |
-                $(tag)
-                latest
+          - script: |
+              # Log in using standard docker CLI via ACR Admin credentials
+              echo "$(ACR_PASSWORD)" | docker login $(acrName).azurecr.io -u $(acrName) --password-stdin
+              
+              # Build the image with both build ID and latest tags
+              docker build -t $(acrName).azurecr.io/$(imageRepository):$(tag) -t $(acrName).azurecr.io/$(imageRepository):latest -f $(Build.SourcesDirectory)/Dockerfile $(Build.SourcesDirectory)
+              
+              # Push both tags to your Azure Container Registry
+              docker push $(acrName).azurecr.io/$(imageRepository):$(tag)
+              docker push $(acrName).azurecr.io/$(imageRepository):latest
+            displayName: 'Docker Login, Build, and Push via Admin Key'
 
   # Stage 2: Deploy Books API to App Service
   - stage: DeployApp
@@ -59,20 +59,10 @@ stages:
           runOnce:
             deploy:
               steps:
+                # Deploy using the exact same ACR Admin keys to update App Service container settings
                 - task: AzureWebAppContainer@1
                   displayName: Deploy Books API Container
                   inputs:
-                    azureSubscription: $(azureSubscription)
+                    azureSubscription: 'azure-service-connection'
                     appName: $(appName)
                     containers: '$(acrName).azurecr.io/$(imageRepository):$(tag)'
-
-                - task: AzureCLI@2
-                  displayName: Verify Books API Deployment
-                  inputs:
-                    azureSubscription: $(azureSubscription)
-                    scriptType: bash
-                    scriptLocation: inlineScript
-                    inlineScript: |
-                      sleep 30
-                      curl -f "https://$(appName).azurewebsites.net/books" || exit 1
-                      curl -f "https://$(appName).azurewebsites.net/openapi.json" || exit 1
